@@ -1,3 +1,7 @@
 *
 !.gitignore
 !ga.py
+!model.py
+!model/
+!model/*
+

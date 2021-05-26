@@ -4,4 +4,5 @@
 !model.py
 !model/
 !model/*
+!model/*/*
 

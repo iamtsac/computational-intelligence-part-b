@@ -1,64 +1,91 @@
-import sys
-import os
+import tensorflow.keras
+import pygad.kerasga
+import numpy
 import pygad
-import tensorflow as tf
-import numpy as np
 
-no_of_generations = 15
-no_of_individuals = 10
-mutate_factor = 0.1
-individuals = []
+def fitness_func(solution, sol_idx):
+    global data_inputs, data_outputs, keras_ga, model
 
-def mutate(new_individual):
-  genes = []
-  for gene in new_individual:
-    n = random.random()
-    if(n < mutate_factor):
-      #Assign random values to certain genes within the maximum acceptable bounds
-      genes.append(random.random())
-    else:
-      genes.append(gene)
-      
-  return genes
+    model_weights_matrix = pygad.kerasga.model_weights_as_matrix(model=model,
+                                                                   weights_vector=solution)
 
-def crossover(individuals):
-    new_individuals = []
+    model.set_weights(weights=model_weights_matrix)
 
-    new_individuals.append(individuals[0])
-    new_individuals.append(individuals[1])
+    predictions = model.predict(data_inputs)
 
-    for i in range(2, no_of_individuals):
-        new_individual = []
-        if(i < (no_of_individuals - 2)):
-            if(i == 2):
-                parentA = random.choice(individuals[:3])
-                parentB = random.choice(individuals[:3])
-            else:
-                parentA = random.choice(individuals[:])
-                parentB = random.choice(individuals[:])
+    cce = tensorflow.keras.losses.CategoricalCrossentropy()
+    solution_fitness = 1.0 / (cce(data_outputs, predictions).numpy() + 0.00000001)
 
-            for i in range(len(parentA)):
-                n = random.random()
-                if(n< 0.5):
-                    new_individual.append(parentA[i])
-                else:
-                    new_individual.append(parentB[i])
-         
-        else:
-            new_individual = random.choice(individuals[:])
+    return solution_fitness
 
-        new_individuals.append(mutate(new_individual))
-        #new_individuals.append(new_individual)
+def callback_generation(ga_instance):
+    print("Generation = {generation}".format(generation=ga_instance.generations_completed))
+    print("Fitness    = {fitness}".format(fitness=ga_instance.best_solution()[1]))
 
-    return new_individuals
+# Build the keras model using the functional API.
+input_layer  = tensorflow.keras.layers.Input(360)
+dense_layer = tensorflow.keras.layers.Dense(50, activation="relu")(input_layer)
+output_layer = tensorflow.keras.layers.Dense(4, activation="softmax")(dense_layer)
 
-def evolve(individuals, fitness):
-  
-    sorted_y_idx_list = sorted(range(len(fitness)),key=lambda x:fitness[x])
-    individuals = [individuals[i] for i in sorted_y_idx_list ]
+model = tensorflow.keras.Model(inputs=input_layer, outputs=output_layer)
 
-    individuals.reverse()
+# Create an instance of the pygad.kerasga.KerasGA class to build the initial population.
+keras_ga = pygad.kerasga.KerasGA(model=model,
+                                   num_solutions=10)
 
-    new_individuals = crossover(individuals)
+# Data inputs
+data_inputs = numpy.load("dataset_features.npy")
 
-    return new_individuals
+# Data outputs
+data_outputs = numpy.load("outputs.npy")
+data_outputs = tensorflow.keras.utils.to_categorical(data_outputs)
+
+# Prepare the PyGAD parameters. Check the documentation for more information: https://pygad.readthedocs.io/en/latest/README_pygad_ReadTheDocs.html#pygad-ga-class
+num_generations = 100 # Number of generations.
+num_parents_mating = 5 # Number of solutions to be selected as parents in the mating pool.
+initial_population = keras_ga.population_weights # Initial population of network weights.
+parent_selection_type = "sss" # Type of parent selection.
+crossover_type = "single_point" # Type of the crossover operator.
+mutation_type = "random" # Type of the mutation operator.
+mutation_percent_genes = 10 # Percentage of genes to mutate. This parameter has no action if the parameter mutation_num_genes exists.
+keep_parents = -1 # Number of parents to keep in the next population. -1 means keep all parents and 0 means keep nothing.
+
+# Create an instance of the pygad.GA class
+ga_instance = pygad.GA(num_generations=num_generations,
+                       num_parents_mating=num_parents_mating,
+                       initial_population=initial_population,
+                       fitness_func=fitness_func,
+                       parent_selection_type=parent_selection_type,
+                       crossover_type=crossover_type,
+                       mutation_type=mutation_type,
+                       mutation_percent_genes=mutation_percent_genes,
+                       keep_parents=keep_parents,
+                       on_generation=callback_generation)
+
+# Start the genetic algorithm evolution.
+ga_instance.run()
+
+# After the generations complete, some plots are showed that summarize how the outputs/fitness values evolve over generations.
+ga_instance.plot_result(title="PyGAD & Keras - Iteration vs. Fitness", linewidth=4)
+
+# Returning the details of the best solution.
+solution, solution_fitness, solution_idx = ga_instance.best_solution()
+print("Fitness value of the best solution = {solution_fitness}".format(solution_fitness=solution_fitness))
+print("Index of the best solution : {solution_idx}".format(solution_idx=solution_idx))
+
+# Fetch the parameters of the best solution.
+best_solution_weights = pygad.kerasga.model_weights_as_matrix(model=model,
+                                                                weights_vector=solution)
+model.set_weights(best_solution_weights)
+predictions = model.predict(data_inputs)
+# print("Predictions : \n", predictions)
+
+# Calculate the categorical crossentropy for the trained model.
+cce = tensorflow.keras.losses.CategoricalCrossentropy()
+print("Categorical Crossentropy : ", cce(data_outputs, predictions).numpy())
+
+# Calculate the classification accuracy for the trained model.
+ca = tensorflow.keras.metrics.CategoricalAccuracy()
+ca.update_state(data_outputs, predictions)
+accuracy = ca.result().numpy()
+print("Accuracy : ", accuracy)

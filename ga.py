@@ -1,91 +1,75 @@
-import tensorflow.keras
-import pygad.kerasga
-import numpy
-import pygad
+import random
+import tensorflow as tf 
+import numpy as np 
+import pandas as pd 
+import matplotlib.pyplot as plt
+from deap import creator, base, algorithms,tools
 
-def fitness_func(solution, sol_idx):
-    global data_inputs, data_outputs, keras_ga, model
+N=10000
+df = pd.read_csv('data/mnist_train.csv')
+images = df.loc[:, df.columns != 'label'].to_numpy().reshape(df.shape[0],28,28) 
+images = tf.keras.utils.normalize(images)
+images = images[:N]
+#print(images[0])
 
-    model_weights_matrix = pygad.kerasga.model_weights_as_matrix(model=model,
-                                                                   weights_vector=solution)
+labels = df['label'].to_numpy() 
+default_labels= labels[:N]
+labels = tf.keras.utils.to_categorical(labels,10)
+labels = labels[:N]
 
-    model.set_weights(weights=model_weights_matrix)
+model = tf.keras.models.load_model('model.h5') 
 
-    predictions = model.predict(data_inputs)
+creator.create("FitnessMax", base.Fitness, weights = (1.0,))
+creator.create("Individual", list, fitness=creator.FitnessMax)
 
-    cce = tensorflow.keras.losses.CategoricalCrossentropy()
-    solution_fitness = 1.0 / (cce(data_outputs, predictions).numpy() + 0.00000001)
+toolbox = base.Toolbox()
 
-    return solution_fitness
+toolbox.register("attr_bool", random.randint, 0, 1)
 
-def callback_generation(ga_instance):
-    print("Generation = {generation}".format(generation=ga_instance.generations_completed))
-    print("Fitness    = {fitness}".format(fitness=ga_instance.best_solution()[1]))
+toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, 784)
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-# Build the keras model using the functional API.
-input_layer  = tensorflow.keras.layers.Input(360)
-dense_layer = tensorflow.keras.layers.Dense(50, activation="relu")(input_layer)
-output_layer = tensorflow.keras.layers.Dense(4, activation="softmax")(dense_layer)
+def fitness_func(individual):
+    test = list()
+    individual = np.array(individual).reshape(28,28)
+    inputs = np.multiply(individual,images)
+    loss, acc = model.evaluate(inputs,labels,verbose=0)
+    predicts = model.predict(inputs) 
+    classes = np.argmax(predicts, axis=1) 
+    test.append(float((classes != default_labels).sum()/float(classes.size)))
 
-model = tensorflow.keras.Model(inputs=input_layer, outputs=output_layer)
+    return test
 
-# Create an instance of the pygad.kerasga.KerasGA class to build the initial population.
-keras_ga = pygad.kerasga.KerasGA(model=model,
-                                   num_solutions=10)
+toolbox.register("evaluate", fitness_func)
 
-# Data inputs
-data_inputs = numpy.load("dataset_features.npy")
+toolbox.register("mate", tools.cxTwoPoint)
 
-# Data outputs
-data_outputs = numpy.load("outputs.npy")
-data_outputs = tensorflow.keras.utils.to_categorical(data_outputs)
+toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
 
-# Prepare the PyGAD parameters. Check the documentation for more information: https://pygad.readthedocs.io/en/latest/README_pygad_ReadTheDocs.html#pygad-ga-class
-num_generations = 100 # Number of generations.
-num_parents_mating = 5 # Number of solutions to be selected as parents in the mating pool.
-initial_population = keras_ga.population_weights # Initial population of network weights.
-parent_selection_type = "sss" # Type of parent selection.
-crossover_type = "single_point" # Type of the crossover operator.
-mutation_type = "random" # Type of the mutation operator.
-mutation_percent_genes = 10 # Percentage of genes to mutate. This parameter has no action if the parameter mutation_num_genes exists.
-keep_parents = -1 # Number of parents to keep in the next population. -1 means keep all parents and 0 means keep nothing.
+toolbox.register("select", tools.selTournament, tournsize=3)
 
-# Create an instance of the pygad.GA class
-ga_instance = pygad.GA(num_generations=num_generations,
-                       num_parents_mating=num_parents_mating,
-                       initial_population=initial_population,
-                       fitness_func=fitness_func,
-                       parent_selection_type=parent_selection_type,
-                       crossover_type=crossover_type,
-                       mutation_type=mutation_type,
-                       mutation_percent_genes=mutation_percent_genes,
-                       keep_parents=keep_parents,
-                       on_generation=callback_generation)
+def main():
 
-# Start the genetic algorithm evolution.
-ga_instance.run()
+    random.seed(64)
+    
+    pop = toolbox.population(n=20)
+    
+    # np equality function (operators.eq) between two arrays returns the
+    # equality element wise, which raises an exception in the if similar()
+    # check of the hall of fame. Using a different equality function like
+    # np.array_equal or np.allclose solve this issue.
+    hof = tools.HallOfFame(1)
+    
+    stats = tools.Statistics(lambda ind: ind.fitness.values)
+    stats.register("avg", np.mean)
+    stats.register("std", np.std)
+    stats.register("min", np.min)
+    stats.register("max", np.max)
+    
+    algorithms.eaSimple(pop, toolbox, cxpb=0.6, mutpb=0.1, ngen=20, stats=stats,
+                        halloffame=hof)
 
-# After the generations complete, some plots are showed that summarize how the outputs/fitness values evolve over generations.
-ga_instance.plot_result(title="PyGAD & Keras - Iteration vs. Fitness", linewidth=4)
+    return pop, stats, hof
 
-# Returning the details of the best solution.
-solution, solution_fitness, solution_idx = ga_instance.best_solution()
-print("Fitness value of the best solution = {solution_fitness}".format(solution_fitness=solution_fitness))
-print("Index of the best solution : {solution_idx}".format(solution_idx=solution_idx))
+pop, stat, hof = main()
 
-# Fetch the parameters of the best solution.
-best_solution_weights = pygad.kerasga.model_weights_as_matrix(model=model,
-                                                                weights_vector=solution)
-model.set_weights(best_solution_weights)
-predictions = model.predict(data_inputs)
-# print("Predictions : \n", predictions)
-
-# Calculate the categorical crossentropy for the trained model.
-cce = tensorflow.keras.losses.CategoricalCrossentropy()
-print("Categorical Crossentropy : ", cce(data_outputs, predictions).numpy())
-
-# Calculate the classification accuracy for the trained model.
-ca = tensorflow.keras.metrics.CategoricalAccuracy()
-ca.update_state(data_outputs, predictions)
-accuracy = ca.result().numpy()
-print("Accuracy : ", accuracy)

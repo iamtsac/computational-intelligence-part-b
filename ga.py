@@ -1,6 +1,6 @@
 import random
 import tensorflow as tf 
-import numpy as np 
+import numpy as np, numpy
 import pandas as pd 
 import matplotlib.pyplot as plt
 from deap import creator, base, algorithms,tools
@@ -48,32 +48,11 @@ toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
 
 toolbox.register("select", tools.selTournament, tournsize=3)
 
-#def main():
-#
-#    random.seed(64)
-#    
-#    pop = toolbox.population(n=20)
-#    
-#    # np equality function (operators.eq) between two arrays returns the
-#    # equality element wise, which raises an exception in the if similar()
-#    # check of the hall of fame. Using a different equality function like
-#    # np.array_equal or np.allclose solve this issue.
-#    hof = tools.HallOfFame(1)
-#    
-#    stats = tools.Statistics(lambda ind: ind.fitness.values)
-#    stats.register("avg", np.mean)
-#    stats.register("std", np.std)
-#    stats.register("min", np.min)
-#    stats.register("max", np.max)
-#    
-#    algorithms.eaSimple(pop, toolbox, cxpb=0.6, mutpb=0.1, ngen=20, stats=stats,
-#                        halloffame=hof)
-#
-#    return pop, stats, hof
 
 def evolve(pop_size,crossover_pb,mutate_pb):
-    random.seed(64)
+    random.seed(64) 
 
+    logbook = tools.Logbook()
     # create an initial population of 300 individuals (where
     # each individual is a list of integers)
     pop = toolbox.population(n=pop_size)
@@ -83,6 +62,7 @@ def evolve(pop_size,crossover_pb,mutate_pb):
     #
     # MUTPB is the probability for mutating an individual
     CXPB, MUTPB = crossover_pb, mutate_pb
+    hof = tools.HallOfFame(1)
     
     print("Start of evolution")
     
@@ -98,7 +78,8 @@ def evolve(pop_size,crossover_pb,mutate_pb):
 
     # Variable keeping track of the number of generations
     g = 0
-    
+
+    stats = tools.Statistics(key=lambda ind: ind.fitness.values) 
     check_criteria =0
     prev_fit = max(fits)
     # Begin the evolution
@@ -139,11 +120,17 @@ def evolve(pop_size,crossover_pb,mutate_pb):
         
         print("  Evaluated %i individuals" % len(invalid_ind))
         
-        # The population is entirely replaced by the offspring
-        pop[:] = offspring
-        
         # Gather all the fitnesses in one list and print the stats
+#        fits = [ind.fitness.values[0] for ind in offspring]
+#        offspring = [x for _,x in sorted(zip(fits,offspring))]
+        
+        hof.update(pop)
+#        pop[0] = hof
+#        pop[1:] = offspring[:pop_size-1]
+        
+        pop[:] = offspring
         fits = [ind.fitness.values[0] for ind in pop]
+        
 
         if max(fits) < (1.001*prev_fit) or prev_fit == max(fits):
             check_criteria += 1
@@ -157,14 +144,36 @@ def evolve(pop_size,crossover_pb,mutate_pb):
         sum2 = sum(x*x for x in fits)
         std = abs(sum2 / length - mean**2)**0.5
         
+        logbook.header = ["gen"] + stats.fields
         print("  Min %s" % min(fits))
         print("  Max %s" % max(fits))
         print("  Avg %s" % mean)
         print("  Std %s" % std)
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats.register("max", numpy.max)
+
+        logbook.record(gen=g, **stats.compile(pop))
     
     print("-- End of (successful) evolution --")
     
-    best_ind = tools.selBest(pop, 1)[0]
-    print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
+    #best_ind = tools.selBest(pop, 1)[0]
+    #print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
+    return logbook
 
-evolve(20,0.6,0.0)
+log = list() 
+
+for _ in range(2):
+    log.append(evolve(20,0.6,0.0))
+
+
+
+df = pd.DataFrame() 
+
+for i in range(0,2):
+    df = pd.concat([df,pd.DataFrame(log[i])])
+
+num_of_gens=df.nunique(axis=0)['gen'] 
+plt.plot([df['max'].loc[(df['gen'] == x)].mean() for x in range(1,num_of_gens+1)]) 
+plt.show()
+
+

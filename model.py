@@ -86,8 +86,8 @@ def train_model(x_train,y_train,x_test,y_test,epochs=5,nodes=10,verbose=0,loss='
         # Model configuration
         model = tf.keras.models.Sequential()
         model.add(tf.keras.layers.Flatten()) # Change input from shape (,28,28) to (,784)
-        model.add(tf.keras.layers.Dense(397, activation='relu',kernel_regularizer=tf.keras.regularizers.L2( l2=r)))
-        model.add(tf.keras.layers.Dense(nodes, activation='relu',kernel_regularizer=tf.keras.regularizers.L2( l2=r)))
+        model.add(tf.keras.layers.Dense(397, activation='relu'))
+        model.add(tf.keras.layers.Dense(128, activation='relu'))
         model.add(tf.keras.layers.Dense(10, activation='softmax'))
         
         model.compile(
@@ -110,10 +110,10 @@ def train_model(x_train,y_train,x_test,y_test,epochs=5,nodes=10,verbose=0,loss='
         find_best.append(val_loss) 
 
         if find_best[len(find_best) - 2] > val_loss and len(find_best)>1 : 
-            model.save("model/")
+            model.save("model.h5")
 
         else:
-            model.save("model/")
+            model.save("model.h5")
 
 
         print('|----------------------------------------------------------------------------|')
@@ -160,37 +160,3 @@ epochs=30
 opt_r=0
 loss_metrics = [ 'categorical_crossentropy','mse']
 train_model(x_train,y_train,x_test,y_test,epochs=epochs,verbose=verbose,learning_rate=opt_learning_rate,plot="off",loss=loss_metrics[0],momentum=opt_momentum,r=opt_r)
-# Training the model and creating plots
-list_of_histories = list()
-mean_mse = np.empty((5,epochs))
-mean_ce = np.empty((5,epochs))
-for loss in loss_metrics:
-    print("|----------------------------------------------------", "\n|  LOSS METRIC IS: ",loss," ")
-    print('|----------------------------------------------------','\n|  Second Layer Nodes:',opt_nodes," Learning Rate:", opt_learning_rate)
-    print('|----------------------------------------------------','\n|  Momentum:',opt_momentum," Weight Decay:",opt_r,"")
-    print('|----------------------------------------------------')
-
-    history,plot = train_model(x_train,y_train,x_test,y_test,epochs=epochs,verbose=verbose,learning_rate=opt_learning_rate,plot=plot,loss=loss,momentum=opt_momentum,r=opt_r)
-    list_of_histories.append(history)
-    for hist in range(len(list_of_histories)): 
-        means_per_loss = np.full((1,epochs),0)
-        for hist_of_loss in range(0,5):
-            means_per_loss = np.vstack((means_per_loss,np.asarray(list_of_histories[hist][hist_of_loss].history['loss'] + [np.nan] * (epochs-len( list_of_histories[hist][hist_of_loss].history['loss'] )))))
-    
-    means_per_loss = np.delete(means_per_loss,(0),axis=0)
-
-    if loss == "mse":
-        mean_mse = np.nanmean(means_per_loss,axis=0)
-    else: 
-        mean_ce = np.nanmean(means_per_loss,axis=0)
-
-if plot=="on":
-    fig = pyplot.figure()
-    plots = fig.add_subplot(1, 1, 1)   
-    plots.plot([ x for x in range(1,epochs+1)], mean_ce,label="CE")
-    plots.plot([ x for x in range(1,epochs+1)], mean_mse, label="MSE")
-    plots.set_xlabel("Epochs")
-    plots.set_ylabel("Mean Of Loss per Epoch")
-    plots.legend()
-    pyplot.title("Convergence")
-    pyplot.show()

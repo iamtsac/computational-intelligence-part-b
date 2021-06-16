@@ -186,40 +186,32 @@ def evolve(pop_size,crossover_pb,mutate_pb):
     return logbook
 
 means = list()
-log = list() 
-df = pd.DataFrame() 
-case = [20,0.6,0.10]
+for case in cases:
+    log = list() 
+    df = pd.DataFrame() 
 
-print("CASE",case[0],case[1],case[2])
-for _ in range(2):
-    log.append(evolve(case[0],case[1],case[2]))
+    print("CASE",case[0],case[1],case[2])
+    for _ in range(2):
+        log.append(evolve(case[0],case[1],case[2]))
+    
+    
+    
+    
+    for i in range(0,2):
+        df = pd.concat([df,pd.DataFrame(log[i])])
+    
+    num_of_gens=df.nunique(axis=0)['gen'] 
+    plt.plot([df['max'].loc[(df['gen'] == x)].mean() for x in range(1,num_of_gens+1)]) 
+    plt.xlabel("Generations")
+    plt.ylabel("Best solution fitness")
+    plt.savefig(str(case[0])+'_'+str(case[1])+'_'+str(case[2])+'.png')
+    plt.clf()
+    means.append([df['max'].mean(),df['gen'].mean()])
+    
 
 
-#for case in cases:
-#    log = list() 
-#    df = pd.DataFrame() 
-#
-#    print("CASE",case[0],case[1],case[2])
-#    for _ in range(2):
-#        log.append(evolve(case[0],case[1],case[2]))
-#    
-#    
-#    
-#    
-#    for i in range(0,2):
-#        df = pd.concat([df,pd.DataFrame(log[i])])
-#    
-#    num_of_gens=df.nunique(axis=0)['gen'] 
-#    plt.plot([df['max'].loc[(df['gen'] == x)].mean() for x in range(1,num_of_gens+1)]) 
-#    plt.xlabel("Generations")
-#    plt.ylabel("Best solution fitness")
-#    plt.savefig(str(case[0])+'_'+str(case[1])+'_'+str(case[2])+'.png')
-#    means.append([df['max'].mean(),df['gen'].mean()])
-#    
-#
-#
-#with open('listfile.txt', 'w') as filehandle:
-#    for listitem in means:
-#        filehandle.write('%s\n' % listitem)
-#
-#print(means)
+with open('listfile.txt', 'w') as filehandle:
+    for listitem in means:
+        filehandle.write('%s\n' % listitem)
+
+print(means)

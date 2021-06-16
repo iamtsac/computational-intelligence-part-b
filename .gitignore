@@ -5,6 +5,7 @@
 !model/
 !model/*
 !model/*/*
+!model.h5
 !report/
 !report/images/
 !report/images/*

@@ -215,3 +215,5 @@ with open('listfile.txt', 'w') as filehandle:
         filehandle.write('%s\n' % listitem)
 
 print(means)
+
+

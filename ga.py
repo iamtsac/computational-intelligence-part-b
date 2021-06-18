@@ -15,12 +15,12 @@ cases = [[20,0.6,0.00],
          [200,0.6,0.10],
          [200,0.9,0.01],
          [200,0.1,0.01]]
+
 N=10000
 df = pd.read_csv('data/mnist_train.csv')
 images = df.loc[:, df.columns != 'label'].to_numpy().reshape(df.shape[0],28,28) 
 images = tf.keras.utils.normalize(images)
 images = images[:N]
-#print(images[0])
 
 labels = df['label'].to_numpy() 
 default_labels= labels[:N]
@@ -28,6 +28,19 @@ labels = tf.keras.utils.to_categorical(labels,10)
 labels = labels[:N]
 
 model = tf.keras.models.load_model('model.h5') 
+
+def fitness_func(individual):
+    output = list()
+    individual = np.array(individual).reshape(28,28)
+    inputs = np.multiply(individual,images)
+    loss, acc = model.evaluate(inputs,labels,verbose=0)
+    ones = np.count_nonzero(individual==1)
+    if ones > 300:
+        print((loss/100)*(ones - 300))
+        output.append((acc - (loss/100)*(ones - 300)))
+    else:
+        output.append(acc)
+    return output
 
 creator.create("FitnessMax", base.Fitness, weights = (1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMax)
@@ -39,32 +52,8 @@ toolbox.register("attr_bool", random.randint, 0, 1)
 toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, 784)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-def fitness_func(individual):
-    test = list()
-    individual = np.array(individual).reshape(28,28)
-    ones = np.count_nonzero(individual==1)
-    inputs = np.multiply(individual,images)
-    loss, acc = model.evaluate(inputs,labels,verbose=0)
-    predicts = model.predict(inputs) 
-    classes = np.argmax(predicts, axis=1) 
-    correct = float((classes != default_labels).sum()/float(classes.size))
-    if ones >300:
-        test.append(acc - (loss/100)*(ones - 300))
-    else:
-        test.append(acc)
-    return test
-
-def feasible(individual):
-    ones = np.count_nonzero(individual==1)
-    if ones < 350:
-        return True
-    return False
-def distance(individual):
-    ones = np.count_nonzero(individual==1)
-    return (ones - 350)
 
 toolbox.register("evaluate", fitness_func)
-#toolbox.decorate("evaluate", tools.ClosestValidPenalty(feasible, 350,0.05, distance))
 
 toolbox.register("mate", tools.cxTwoPoint)
 
@@ -77,8 +66,7 @@ def evolve(pop_size,crossover_pb,mutate_pb):
     random.seed(64) 
 
     logbook = tools.Logbook()
-    # create an initial population of 300 individuals (where
-    # each individual is a list of integers)
+    # create an initial population 
     pop = toolbox.population(n=pop_size)
 
     # CXPB  is the probability with which two individuals
@@ -86,26 +74,22 @@ def evolve(pop_size,crossover_pb,mutate_pb):
     #
     # MUTPB is the probability for mutating an individual
     CXPB, MUTPB = crossover_pb, mutate_pb
-    hof = tools.HallOfFame(1)
     
     print("Start of evolution")
     
     # Evaluate the entire population
     fitnesses = list(map(toolbox.evaluate, pop))
     for ind, fit in zip(pop, fitnesses):
-        ind.fitness.values = fit
-    
-    print("  Evaluated %i individuals" % len(pop))
+        ind.fitness.values = fit 
 
     # Extracting all the fitnesses of 
     fits = [ind.fitness.values[0] for ind in pop]
 
-    # Variable keeping track of the number of generations
-    g = 0
-
+    g = 0 # Variable keeping track of the number of generations
     stats = tools.Statistics(key=lambda ind: ind.fitness.values) 
     check_criteria =0
     prev_fit = max(fits)
+
     # Begin the evolution
     while g < 1000 and check_criteria < 5:
         # A new generation
@@ -143,14 +127,6 @@ def evolve(pop_size,crossover_pb,mutate_pb):
             ind.fitness.values = fit
         
         print("  Evaluated %i individuals" % len(invalid_ind))
-        
-        # Gather all the fitnesses in one list and print the stats
-#        fits = [ind.fitness.values[0] for ind in offspring]
-#        offspring = [x for _,x in sorted(zip(fits,offspring))]
-        
-        hof.update(pop)
-#        pop[0] = hof
-#        pop[1:] = offspring[:pop_size-1]
         
         pop[:] = offspring
         fits = [ind.fitness.values[0] for ind in pop]
@@ -215,41 +191,17 @@ def for_plots():
         for listitem in means:
             filehandle.write('%s\n' % listitem)
     
-    print(means) 
 
 def best_sol(case):
-    l,best = evolve(case[0],case[1],case[2])
+    _,best = evolve(case[0],case[1],case[2])
 
-#    with open('best.txt', 'w') as filehandle:
-#        for listitem in best:
-#            filehandle.write('%s\n' % listitem)
+    with open('best.txt', 'w') as filehandle:
+        for listitem in best:
+            filehandle.write('%s\n' % listitem)
     plt.imshow(np.multiply(np.array(best).reshape(28,28),images[0]),cmap='gray')
-    #plt.imshow(np.array(best).reshape(28,28),cmap='gray')
+    plt.imshow(np.array(best).reshape(28,28),cmap='gray')
     plt.show()
     inputs = np.multiply(np.array(best).reshape(28,28),images)
     loss, acc = model.evaluate(inputs,labels,verbose=1)
 
-
-best = []
-
-with open('best.txt', 'r') as filehandle:
-    for line in filehandle:
-        # remove linebreak which is the last character of the string
-        currentPlace = line[:-1]
-
-        # add item to the list
-        best.append(currentPlace)
-
-
-#best = np.array(list(map(int,best)))
-#plt.imshow(np.multiply(best.reshape(28,28),images[0]),cmap='gray')
-#plt.savefig('report/images/image0_f.png') 
-#plt.clf() 
-#plt.imshow(images[0],cmap='gray')
-#plt.savefig('report/images/image0.png')
-
-#inputs = np.multiply(best.reshape(28,28),images)
-#loss, acc = model.evaluate(inputs,labels,verbose=1)
-
-
-best_sol(cases[3])
+best_sol(cases[4])

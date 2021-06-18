@@ -43,29 +43,28 @@ def fitness_func(individual):
     test = list()
     individual = np.array(individual).reshape(28,28)
     ones = np.count_nonzero(individual==1)
-    print(ones)
     inputs = np.multiply(individual,images)
     loss, acc = model.evaluate(inputs,labels,verbose=0)
     predicts = model.predict(inputs) 
     classes = np.argmax(predicts, axis=1) 
     correct = float((classes != default_labels).sum()/float(classes.size))
-#    if ones >400:
-#        test.append(correct - ((1-correct)/1000)*(ones - 400))
-#    else:
-    test.append(correct)
+    if ones >300:
+        test.append(acc - (loss/100)*(ones - 300))
+    else:
+        test.append(acc)
     return test
 
 def feasible(individual):
     ones = np.count_nonzero(individual==1)
-    if ones < 500:
+    if ones < 350:
         return True
     return False
 def distance(individual):
     ones = np.count_nonzero(individual==1)
-    return (ones - 500)
+    return (ones - 350)
 
 toolbox.register("evaluate", fitness_func)
-toolbox.decorate("evaluate", tools.ClosestValidPenalty(feasible, 500,0.00001, distance))
+#toolbox.decorate("evaluate", tools.ClosestValidPenalty(feasible, 350,0.05, distance))
 
 toolbox.register("mate", tools.cxTwoPoint)
 
@@ -181,39 +180,76 @@ def evolve(pop_size,crossover_pb,mutate_pb):
     
     print("-- End of (successful) evolution --")
     
-    #best_ind = tools.selBest(pop, 1)[0]
+    best_ind = tools.selBest(pop, 1)[0]
     #print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
-    return logbook
+    return logbook,best_ind
 
-means = list()
-for case in cases:
-    log = list() 
-    df = pd.DataFrame() 
-
-    print("CASE",case[0],case[1],case[2])
-    for _ in range(2):
-        log.append(evolve(case[0],case[1],case[2]))
+def for_plots():
+    means = list()
+    for case in cases:
+        log = list() 
+        df = pd.DataFrame() 
+    
+        print("CASE",case[0],case[1],case[2])
+        for _ in range(3):
+            logs,_ = evolve(case[0],case[1],case[2])
+            log.append(logs)
+        
+        
+        
+        
+        for i in range(0,3):
+            df = pd.concat([df,pd.DataFrame(log[i])])
+        
+        num_of_gens=df.nunique(axis=0)['gen'] 
+        plt.plot([df['max'].loc[(df['gen'] == x)].mean() for x in range(1,num_of_gens+1)]) 
+        plt.xlabel("Generations")
+        plt.ylabel("Best solution fitness")
+        plt.savefig(str(case[0])+'_'+str(case[1])+'_'+str(case[2])+'.png')
+        plt.clf()
+        means.append([df['max'].mean(),df['gen'].mean()])
+        
     
     
+    with open('listfile.txt', 'w') as filehandle:
+        for listitem in means:
+            filehandle.write('%s\n' % listitem)
     
-    
-    for i in range(0,2):
-        df = pd.concat([df,pd.DataFrame(log[i])])
-    
-    num_of_gens=df.nunique(axis=0)['gen'] 
-    plt.plot([df['max'].loc[(df['gen'] == x)].mean() for x in range(1,num_of_gens+1)]) 
-    plt.xlabel("Generations")
-    plt.ylabel("Best solution fitness")
-    plt.savefig(str(case[0])+'_'+str(case[1])+'_'+str(case[2])+'.png')
-    plt.clf()
-    means.append([df['max'].mean(),df['gen'].mean()])
-    
+    print(means) 
+
+def best_sol(case):
+    l,best = evolve(case[0],case[1],case[2])
+
+#    with open('best.txt', 'w') as filehandle:
+#        for listitem in best:
+#            filehandle.write('%s\n' % listitem)
+    plt.imshow(np.multiply(np.array(best).reshape(28,28),images[0]),cmap='gray')
+    #plt.imshow(np.array(best).reshape(28,28),cmap='gray')
+    plt.show()
+    inputs = np.multiply(np.array(best).reshape(28,28),images)
+    loss, acc = model.evaluate(inputs,labels,verbose=1)
 
 
-with open('listfile.txt', 'w') as filehandle:
-    for listitem in means:
-        filehandle.write('%s\n' % listitem)
+best = []
 
-print(means)
+with open('best.txt', 'r') as filehandle:
+    for line in filehandle:
+        # remove linebreak which is the last character of the string
+        currentPlace = line[:-1]
+
+        # add item to the list
+        best.append(currentPlace)
 
 
+#best = np.array(list(map(int,best)))
+#plt.imshow(np.multiply(best.reshape(28,28),images[0]),cmap='gray')
+#plt.savefig('report/images/image0_f.png') 
+#plt.clf() 
+#plt.imshow(images[0],cmap='gray')
+#plt.savefig('report/images/image0.png')
+
+#inputs = np.multiply(best.reshape(28,28),images)
+#loss, acc = model.evaluate(inputs,labels,verbose=1)
+
+
+best_sol(cases[3])

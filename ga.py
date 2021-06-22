@@ -29,7 +29,7 @@ images_test = tf.keras.utils.normalize(images_test)
 labels_test = df_test['label'].to_numpy() 
 labels_test = tf.keras.utils.to_categorical(labels_test,10)
 
-labels = df_test['label'].to_numpy() 
+labels = df['label'].to_numpy() 
 default_labels= labels[:N]
 labels = tf.keras.utils.to_categorical(labels,10)
 labels = labels[:N]
@@ -132,8 +132,6 @@ def evolve(pop_size,crossover_pb,mutate_pb):
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
         
-        print("  Evaluated %i individuals" % len(invalid_ind))
-        
         pop[:] = offspring
         fits = [ind.fitness.values[0] for ind in pop]
         
@@ -191,7 +189,7 @@ def for_plots():
             filehandle.write('%s\n' % listitem)
     
 
-def best_sol(case=cases[7]):
+def best_sol(case=cases[8]):
     _,best = evolve(case[0],case[1],case[2])
 
     with open('best.txt', 'w') as filehandle:
@@ -203,10 +201,10 @@ def best_sol(case=cases[7]):
     inputs = np.multiply(np.array(best).reshape(28,28),images)
     loss, acc = model.evaluate(inputs,labels,verbose=1)
 
-def eval():
+def eval_best():
     best_solution = list()
 
-    with open('best.txt','r') as filehandle:
+    with open('best_solution.txt','r') as filehandle:
         for line in filehandle:
             currentPlace = line[:-1]
 
@@ -218,4 +216,6 @@ def eval():
     print("ga")
     model.evaluate(new_in,labels_test,verbose=1)
 
-eval()
+#for_plots() #10 times for each case
+best_sol() #best case 
+eval_best() #check acc of best

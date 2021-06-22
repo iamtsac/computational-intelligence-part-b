@@ -22,7 +22,14 @@ images = df.loc[:, df.columns != 'label'].to_numpy().reshape(df.shape[0],28,28)
 images = tf.keras.utils.normalize(images)
 images = images[:N]
 
-labels = df['label'].to_numpy() 
+df_test = pd.read_csv('data/mnist_test.csv')
+images_test = df_test.loc[:, df_test.columns != 'label'].to_numpy().reshape(df_test.shape[0],28,28) 
+images_test = tf.keras.utils.normalize(images_test)
+
+labels_test = df_test['label'].to_numpy() 
+labels_test = tf.keras.utils.to_categorical(labels_test,10)
+
+labels = df_test['label'].to_numpy() 
 default_labels= labels[:N]
 labels = tf.keras.utils.to_categorical(labels,10)
 labels = labels[:N]
@@ -36,7 +43,6 @@ def fitness_func(individual):
     loss, acc = model.evaluate(inputs,labels,verbose=0)
     ones = np.count_nonzero(individual==1)
     if ones > 300:
-        print((loss/100)*(ones - 300))
         output.append((acc - (loss/100)*(ones - 300)))
     else:
         output.append(acc)
@@ -139,16 +145,9 @@ def evolve(pop_size,crossover_pb,mutate_pb):
 
         prev_fit = max(fits) 
         
-        length = len(pop)
-        mean = sum(fits) / length
-        sum2 = sum(x*x for x in fits)
-        std = abs(sum2 / length - mean**2)**0.5
         
         logbook.header = ["gen"] + stats.fields
-        print("  Min %s" % min(fits))
         print("  Max %s" % max(fits))
-        print("  Avg %s" % mean)
-        print("  Std %s" % std)
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("max", numpy.max)
 
@@ -167,14 +166,14 @@ def for_plots():
         df = pd.DataFrame() 
     
         print("CASE",case[0],case[1],case[2])
-        for _ in range(3):
+        for _ in range(2):
             logs,_ = evolve(case[0],case[1],case[2])
             log.append(logs)
         
         
         
         
-        for i in range(0,3):
+        for i in range(0,2):
             df = pd.concat([df,pd.DataFrame(log[i])])
         
         num_of_gens=df.nunique(axis=0)['gen'] 
@@ -192,7 +191,7 @@ def for_plots():
             filehandle.write('%s\n' % listitem)
     
 
-def best_sol(case):
+def best_sol(case=cases[7]):
     _,best = evolve(case[0],case[1],case[2])
 
     with open('best.txt', 'w') as filehandle:
@@ -204,4 +203,19 @@ def best_sol(case):
     inputs = np.multiply(np.array(best).reshape(28,28),images)
     loss, acc = model.evaluate(inputs,labels,verbose=1)
 
-best_sol(cases[4])
+def eval():
+    best_solution = list()
+
+    with open('best.txt','r') as filehandle:
+        for line in filehandle:
+            currentPlace = line[:-1]
+
+            best_solution.append(currentPlace)
+    best_solution = np.array(list(map(int,best_solution))).reshape(28,28)
+    new_in = np.multiply(best_solution,images_test)
+    print("model")
+    model.evaluate(images_test,labels_test,verbose=1)
+    print("ga")
+    model.evaluate(new_in,labels_test,verbose=1)
+
+eval()

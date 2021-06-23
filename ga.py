@@ -195,9 +195,6 @@ def best_sol(case=cases[8]):
     with open('best_solution.txt', 'w') as filehandle:
         for listitem in best:
             filehandle.write('%s\n' % listitem)
-    plt.imshow(np.multiply(np.array(best).reshape(28,28),images[0]),cmap='gray')
-    plt.imshow(np.array(best).reshape(28,28),cmap='gray')
-    plt.show()
     inputs = np.multiply(np.array(best).reshape(28,28),images)
     loss, acc = model.evaluate(inputs,labels,verbose=1)
 

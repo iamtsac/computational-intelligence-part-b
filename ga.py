@@ -164,14 +164,14 @@ def for_plots():
         df = pd.DataFrame() 
     
         print("CASE",case[0],case[1],case[2])
-        for _ in range(2):
+        for _ in range(10):
             logs,_ = evolve(case[0],case[1],case[2])
             log.append(logs)
         
         
         
         
-        for i in range(0,2):
+        for i in range(10):
             df = pd.concat([df,pd.DataFrame(log[i])])
         
         num_of_gens=df.nunique(axis=0)['gen'] 
